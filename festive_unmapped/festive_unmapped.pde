@@ -33,10 +33,10 @@ int frameCounter = 0;
 
 //A distributed dimming/twinkling effect, not following a wave driven by the timer.
 int twinkleInterval = 7; //how many LEDs between twinkles in a set
-int twinkleOffset = 3; //how much each twinkle set is offset from the previous
+int twinkleOffset = 4; //how much each twinkle set is offset from the previous
 int twinkleStart = twinkleOffset; //Start the first twinkle this far ahead of the start of the address space. (this will change)
-float twinkleSeconds = 2; //time spent dimming, then brightening
-float twinkleDim = .8; //factor brightness reduction
+float twinkleSeconds = 1.5; //time spent dimming, then again spent brightening
+float twinkleDim = .5; //factor brightness reduction
 
 //Propagation speed of hue waves; multiplier of millisecond count.
 float hueSpd = 0.06;
@@ -65,38 +65,35 @@ void setup()
 
 void draw()
 {
+  //Reset twinkling counter if a cycle has elapsed, and snap back the start address if it's too far forward
+  if (frameCounter >= (framesPerSecond * twinkleSeconds)) { //One cycle per twinkleSeconds period, counted in frames
+    frameCounter = 0;
+    twinkleStart += twinkleOffset; //Move the start address by the offset
+    if (twinkleStart >= twinkleInterval) { //If the start offset is the size (or larger) of the interval...
+      twinkleStart %= twinkleInterval; //...use the modulus of the interval to find a new start offset within the first interval,
+      //otherwise there will be a growing wall of non-twinkling at the start of the address space, eventually consuming the whole space
+    }
+  }
 
   for (int i = 0; i < 512; i++) {
     //Set some defaults, in case we want to comment out any of the waves.
     //Sets brightness to 100%.
-    float brightness = 512 * pixelInterval; //overridden by twinkling
+    float brightness = 1 * pixelInterval; //overridden by twinkling
     float saturation = .15 * pixelInterval; //overridden by desaturation (white) waves
     float hue = i % pixelInterval; //overridden by hue cycles
 
     //****************
     //Twinkling effect
 
-    //Reset twinkling counter if a cycle has elapsed, and snap back the start address if it's too far forward
-    if (frameCounter >= (framesPerSecond * twinkleSeconds)) { //One cycle per twinkleSeconds period, counted in frames
-      frameCounter = 0;
-      twinkleStart += twinkleOffset; //Move the start address by the offset
-      if (twinkleStart >= twinkleInterval) { //If the start offset is the size (or larger) of the interval...
-        twinkleStart %= twinkleInterval; //...use the modulus of the interval to find a new start offset within the first interval,
-        //otherwise there will be a growing wall of non-twinkling at the start of the address space, eventually consuming the whole space
-      }
-    }
     //Twinkling brightness adjustments
-    if (i % twinkleInterval==twinkleStart) { //Select a group of LED addresses spaced at intervals, with a starting offset
-      if (frameCounter < (framesPerSecond * twinkleSeconds/2)) { //Dimming for first half of the cycle
-        //A brightness reduction of the max dimming * framecount as a fraction of half of the frames per cycle (max dimming mid-cycle)
-        brightness -= twinkleDim * pixelInterval * frameCounter/(framesPerSecond * twinkleSeconds/2);
-      } else { //Returning to full brightness for the second half
-        //A brightness reduction that flips. Half of the cycle is subtracted from the frameCounter (because we're counting frames post-midpoint)
-        //and then a fraction is made of 1 minus that new count as a fraction of half of the frames per cycle.
-        brightness -= twinkleDim * pixelInterval * (1-(frameCounter-(framesPerSecond * twinkleSeconds/2)))/(framesPerSecond * twinkleSeconds/2);
-      }
+    if (i % twinkleInterval == twinkleStart) { //Select a group of LED addresses spaced at intervals, with a starting offset
+      //Dim the current address
+      brightness -= (twinkleDim * pixelInterval) * frameCounter/(framesPerSecond * twinkleSeconds);
     }
-    frameCounter++; //increment after twinkle adjusment
+    if ((i + twinkleOffset) % twinkleInterval == twinkleStart) {
+      //Undim the previous address
+      brightness -= (twinkleDim * pixelInterval) * (1 - (frameCounter/(framesPerSecond * twinkleSeconds)));
+    }
 
     //***********************************
     //Hue cycle effect (aka RAINBOW FADE)
@@ -121,6 +118,7 @@ void draw()
     //emanate from the FadeCandy outwards
     opc.setPixel(511-i, color(hue , saturation , brightness ));
   }
+  frameCounter++; //increment after loop
 
   // When you haven't assigned any LEDs to pixels, you have to explicitly
   // write them to the server. Otherwise, this happens automatically after draw().
