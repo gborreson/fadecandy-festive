@@ -40,9 +40,14 @@ float twinkleDim = .5; //factor brightness reduction
 
 //Propagation speed of hue waves; multiplier of millisecond count.
 float hueSpd = 0.06;
+float hueCycleSec = 15; //Rather than arbitrary multipliers of the millisecond cound, give a time (in seconds) for a cycle to complete
 
-//Wavenumber (inverse of wavelength) of hue waves/cycles per pixel interval.
-float hueWavNum = 1;
+//Wavenumber (inverse of wavelength) of hue waves/cycles per pixel interval. Used in both the continuous full-cycle and sin-wave hue shift.
+float hueWavNum = 3;
+
+//For hue sin waves, mid point and multiplier (0 to 1 scale). If you want degrees, divide by 360.
+float hueSinMid = 210.0/360.0; //Blue-ish midpoint, forcing float math
+float hueSinMult = 90.0/360.0; //Sin wave will oscillate between 120 and 300 degrees hue. This should be green to purple.
 
 //Propagation speed of saturation waves; multiplier of millisecond count.
 float satSpd = 0.15;
@@ -99,7 +104,20 @@ void draw()
     //Hue cycle effect (aka RAINBOW FADE)
 
     //This is just a continuous rainbow fading of all pixels
-    hue = (millis() * hueSpd + i * hueWavNum) % pixelInterval;
+
+    // hue = (millis() * hueSpd + i * hueWavNum) % pixelInterval;
+
+    //*******************************
+    //Hue sin wave around a mid-point
+
+    //Exclusive to above, this performs a hue shift given a starting angle and a multiplier for the sin function.
+
+    //One hueCycleSec interval will accrue 2π radians (one sin cycle). A pixel will go through the full wave once per hueCycleSec seconds.
+    //This is offset pixel by pixel to create a visible sin wave of results at once. If hueWavNum = 0, all pixels will be the same. If less
+    //than one, a partial wave will be displayed. If hueWavNum = 1, a full 2π radians (one sin wave) of offset will be spread over the pixels,
+    //and the end pixel will flow smoothly with the beginning pixel. Increasing hueWavNum increases the offset to multiples of 2π radians,
+    //causing that many sin waves to be displayed at once.
+    hue = sin((millis()/1000.0/hueCycleSec + hueWavNum * (i / pixelInterval)) * TWO_PI) * hueSinMult * pixelInterval + hueSinMid * pixelInterval;
 
     //****************************
     //White chasing pattern effect
